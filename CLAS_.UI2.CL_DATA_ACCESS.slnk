@@ -1,0 +1,453 @@
+<?xml version="1.0" encoding="utf-8"?>
+<CLAS CLSNAME="/UI2/CL_DATA_ACCESS" VERSION="1" LANGU="1" DESCRIPT="Dynamic Data Access Helper Class" CATEGORY="00" EXPOSURE="2" STATE="1" RELEASE="0" CLSCCINCL="X" FIXPT="X" UNICODE="X" CLSBCCAT="00" WITH_UNIT_TESTS="X" DURATION_TYPE="0 " RISK_LEVEL="0 " ZSAPLINK_PLUGIN_MAJOR_VERSION="0 " ZSAPLINK_PLUGIN_MINOR_VERSION="1 " ZSAPLINK_PLUGIN_BUILD_VERSION="0 " ZSAPLINK_PLUGIN_INFO1="ZSAPLINK_CLASS is part of the main ZSAPLINK project --&gt; This plugin found there instead of ZSAPLINK_PLUGINS projects" ZSAPLINK_PLUGIN_INFO2="SAPLINK homepage: https://www.assembla.com/spaces/saplink/wiki" ZSAPLINK_PLUGIN_INFO3="Download from https://www.assembla.com/code/saplink/subversion/nodes" ZSAPLINK_PLUGIN_INFO4="and navigate to:  trunk -&gt; core -&gt; ZSAPLINK -&gt; CLAS -&gt; ZSAPLINK_CLASS.slnk">
+ <localImplementation>*&quot;* use this source file for the definition and implementation of
+*&quot;* local helper classes, interface definitions and type
+*&quot;* declarations</localImplementation>
+ <localTypes>*&quot;* use this source file for any type of declarations (class
+*&quot;* definitions, interfaces or type declarations) you need for
+*&quot;* components in the private section</localTypes>
+ <localMacros>*&quot;* use this source file for any macro definitions you need
+*&quot;* in the implementation part of the class</localMacros>
+ <localTestClasses>*&quot;* use this source file for your ABAP unit test classes
+CLASS lc_ut DEFINITION FOR TESTING FINAL &quot;#AU Duration Medium
+  &quot;#AU Risk_Level Harmless
+.
+
+  PUBLIC SECTION.
+    TYPES:
+      BEGIN OF t_properties,
+        enabled     TYPE abap_bool,
+        length      TYPE i,
+        description TYPE c LENGTH 20,
+      END OF t_properties,
+      BEGIN OF t_data,
+        id         TYPE i,
+        properties TYPE t_properties,
+        content    TYPE string,
+      END OF t_data,
+      BEGIN OF t_name_value,
+        name  TYPE string,
+        value TYPE string,
+      END OF t_name_value,
+      BEGIN OF t_example,
+        flag    TYPE abap_bool,
+        props   TYPE t_data,
+        params  TYPE SORTED TABLE OF t_name_value WITH UNIQUE KEY name,
+        params2 TYPE SORTED TABLE OF t_name_value WITH UNIQUE KEY name value,
+      END OF t_example.
+
+    METHODS: test_basic_actions FOR TESTING.
+    METHODS: test_table_access FOR TESTING.
+
+ENDCLASS.       &quot;lc_ut
+
+
+CLASS lc_ut IMPLEMENTATION.
+
+  METHOD test_basic_actions.
+
+    DATA: ls_data TYPE t_example,
+          lr_data TYPE REF TO data,
+          lr_ref  TYPE REF TO data,
+          lv_int  TYPE i,
+          lo_data TYPE REF TO /ui2/cl_data_access,
+          lo_tmp  LIKE lo_data.
+
+    FIELD-SYMBOLS: &lt;data&gt; TYPE data.
+
+    ls_data-props-id      = 12345.
+    ls_data-props-content = `Some Content`.
+    ls_data-props-properties-enabled     = abap_false.
+    ls_data-props-properties-length      = 10.
+    ls_data-props-properties-description = `My description`.
+
+    GET REFERENCE OF ls_data INTO lr_data.
+
+    CREATE OBJECT lo_data EXPORTING ir_data = lr_data.
+
+    &quot; standard way (does not work on SAP_BASIS 700)
+    lo_tmp = lo_data-&gt;at(`PROPS`).
+    lo_tmp = lo_tmp-&gt;at(`id`).
+    lr_ref = lo_tmp-&gt;ref( ).
+    &quot; lr_ref = lo_data-&gt;at(`PROPS`)-&gt;at(`id`)-&gt;ref( ).    =&gt; 700
+    cl_aunit_assert=&gt;assert_bound( act = lr_ref msg = `Dynamic access to existing property fails!` ).
+
+    ASSIGN lr_ref-&gt;* TO &lt;data&gt;.
+    cl_aunit_assert=&gt;assert_equals( act = &lt;data&gt; exp = ls_data-props-id msg = `Dynamic access to existing property fails!` ).
+
+    lo_tmp = lo_data-&gt;at(`PROPS`).
+    lo_tmp = lo_tmp-&gt;at(`key`).
+    lr_ref = lo_tmp-&gt;ref( ).
+    &quot; lr_ref = lo_data-&gt;at(`PROPS`)-&gt;at(`key`)-&gt;ref( ). =&gt; 700
+    cl_aunit_assert=&gt;assert_not_bound( act = lr_ref msg = `Dynamic access to NOT existing property fails!` ).
+
+    &quot; XPath like
+    lo_tmp = lo_data-&gt;at(`PROPS-ID`).
+    lr_ref = lo_tmp-&gt;ref( ).
+    &quot; lr_ref = lo_data-&gt;at(`PROPS-ID`)-&gt;ref( ). =&gt; 700
+    cl_aunit_assert=&gt;assert_bound( act = lr_ref msg = `Dynamic access to existing property fails!` ).
+
+    ASSIGN lr_ref-&gt;* TO &lt;data&gt;.
+    cl_aunit_assert=&gt;assert_equals( act = &lt;data&gt; exp = ls_data-props-id msg = `Dynamic access to existing property fails!` ).
+
+    &quot; Alternative component separator
+    lo_tmp = lo_data-&gt;at(`PROPS-&gt;ID`).
+    lr_ref = lo_tmp-&gt;ref( ).
+    &quot; lr_ref = lo_data-&gt;at(`PROPS-&gt;ID`)-&gt;ref( ). =&gt; 700
+    cl_aunit_assert=&gt;assert_bound( act = lr_ref msg = `Dynamic access to existing property fails!` ).
+
+    ASSIGN lr_ref-&gt;* TO &lt;data&gt;.
+    cl_aunit_assert=&gt;assert_equals( act = &lt;data&gt; exp = ls_data-props-id msg = `Dynamic access to existing property fails!` ).
+
+    &quot; using helper method for creation
+    lo_tmp = /ui2/cl_data_access=&gt;create( ir_data = lr_data iv_component = `PROPS-ID`).
+    lr_ref = lo_tmp-&gt;ref( ).
+    &quot; lr_ref = /ui2/cl_data_access=&gt;create( ir_data = lr_data iv_component = `PROPS-ID`)-&gt;ref( ). =&gt; 700
+    cl_aunit_assert=&gt;assert_bound( act = lr_ref msg = `Dynamic access to existing property fails!` ).
+
+    ASSIGN lr_ref-&gt;* TO &lt;data&gt;.
+    cl_aunit_assert=&gt;assert_equals( act = &lt;data&gt; exp = ls_data-props-id msg = `Dynamic access to existing property fails!` ).
+
+    &quot; reading value
+    lo_tmp = lo_data-&gt;at(`props-properties-length`).
+    lo_tmp-&gt;value( IMPORTING ev_data = lv_int ).
+    &quot; lo_data-&gt;at(`props-properties-length`)-&gt;value( IMPORTING ev_data = lv_int ). =&gt; 700
+    cl_aunit_assert=&gt;assert_equals( act = lv_int exp = ls_data-props-properties-length msg = `Dynamic read of existing the property fails!` ).
+
+    lv_int = 25.
+    lo_tmp = lo_data-&gt;at(`props-properties-len`).
+    lo_tmp-&gt;value( IMPORTING ev_data = lv_int ).
+    &quot; lo_data-&gt;at(`props-properties-len`)-&gt;value( IMPORTING ev_data = lv_int ). =&gt; 700
+    cl_aunit_assert=&gt;assert_initial( act = lv_int msg = `Dynamic read of the NOT existing property fails!` ).
+
+    &quot; modifing value
+    lv_int = 25.
+    lo_tmp = lo_data-&gt;at(`props-properties-length`).
+    lr_ref = lo_tmp-&gt;ref( ).
+    &quot; lr_ref = lo_data-&gt;at(`props-properties-length`)-&gt;ref( ). =&gt; 700
+    ASSIGN lr_ref-&gt;* TO &lt;data&gt;.
+    &lt;data&gt; = lv_int.
+    cl_aunit_assert=&gt;assert_equals( act = lv_int exp = ls_data-props-properties-length msg = `Dynamic modification of the existing property fails!` ).
+
+    lv_int = 15.
+    lo_tmp = lo_data-&gt;at(`props-properties-length`).
+    lo_tmp-&gt;set( lv_int ).
+    &quot; lo_data-&gt;at(`props-properties-length`)-&gt;set( lv_int ). =&gt; 700
+    cl_aunit_assert=&gt;assert_equals( act = lv_int exp = ls_data-props-properties-length msg = `Dynamic modification of the existing property fails!` ).
+
+    &quot; degenerated example
+    lv_int = 15.
+    lo_tmp = /ui2/cl_data_access=&gt;create( iv_data = lv_int ).
+    lr_ref = lo_tmp-&gt;ref( ).
+    &quot; lr_ref = /ui2/cl_data_access=&gt;create( iv_data = lv_int )-&gt;ref( ). =&gt; 700
+    ASSIGN lr_ref-&gt;* TO &lt;data&gt;.
+    cl_aunit_assert=&gt;assert_equals( act = &lt;data&gt; exp = lv_int msg = `Dynamic access of existing the property fails!` ).
+
+  ENDMETHOD.
+
+  METHOD test_table_access.
+
+    DATA:
+      ls_data  TYPE t_example,
+      ls_line  LIKE LINE OF ls_data-params,
+      lv_value TYPE string,
+      lo_data  TYPE REF TO /ui2/cl_data_access.
+
+    ls_line-name = `KEY1`.
+    ls_line-value = `Value1`.
+    INSERT ls_line INTO TABLE ls_data-params.
+    INSERT ls_line INTO TABLE ls_data-params2.
+
+    ls_line-name = `KEY2`.
+    ls_line-value = `Value1`.
+    INSERT ls_line INTO TABLE ls_data-params.
+    INSERT ls_line INTO TABLE ls_data-params2.
+
+    ls_line-name = `KEY2`.
+    ls_line-value = `Value2`.
+    INSERT ls_line INTO TABLE ls_data-params.
+    INSERT ls_line INTO TABLE ls_data-params2.
+
+    ls_line-name = `KEY3`.
+    ls_line-value = `Value1, Value2`.
+    INSERT ls_line INTO TABLE ls_data-params.
+    INSERT ls_line INTO TABLE ls_data-params2.
+
+    lo_data = /ui2/cl_data_access=&gt;create( iv_data = ls_data iv_component = `params[2]-name`).
+    lo_data-&gt;value( IMPORTING ev_data = lv_value ).
+
+    cl_aunit_assert=&gt;assert_equals( act = lv_value exp = `KEY2` msg = `Dynamic read to table item by index fails!` ).
+
+    lo_data = /ui2/cl_data_access=&gt;create( iv_data = ls_data iv_component = `params[name=KEY1]-value`).
+    lo_data-&gt;value( IMPORTING ev_data = lv_value ).
+
+    cl_aunit_assert=&gt;assert_equals( act = lv_value exp = `Value1` msg = `Dynamic read to table item by key index fails!` ).
+
+    lo_data = /ui2/cl_data_access=&gt;create( iv_data = ls_data iv_component = `params`).
+    lo_data = lo_data-&gt;at(`[name=KEY1]-value`).
+    lo_data-&gt;value( IMPORTING ev_data = lv_value ).
+
+    cl_aunit_assert=&gt;assert_equals( act = lv_value exp = `Value1` msg = `Dynamic read to table item by key index fails!` ).
+
+    lo_data = /ui2/cl_data_access=&gt;create( iv_data = ls_data iv_component = `params2[name=KEY2, value=Value2]-value`).
+    lo_data-&gt;value( IMPORTING ev_data = lv_value ).
+
+    cl_aunit_assert=&gt;assert_equals( act = lv_value exp = `Value2` msg = `Dynamic read to table item by key index fails!` ).
+
+    &quot; we do not support usage usage of &quot;,&quot; or &quot;]&quot; as part of the key :(
+    lo_data = /ui2/cl_data_access=&gt;create( iv_data = ls_data iv_component = `params2[name=KEY3, value=Value1, Value2]-value`).
+    lo_data-&gt;value( IMPORTING ev_data = lv_value ).
+
+    cl_aunit_assert=&gt;assert_equals( act = lv_value exp = `` msg = `Dynamic read to table item by unescaped key works!` ).
+
+  ENDMETHOD.
+
+ENDCLASS.</localTestClasses>
+ <typeUsage CLSNAME="/UI2/CL_DATA_ACCESS" TYPEGROUP="ABAP" VERSION="1" TPUTYPE="0" EXPLICIT="X"/>
+ <forwardDeclaration>ABAP</forwardDeclaration>
+ <attribute CLSNAME="/UI2/CL_DATA_ACCESS" CMPNAME="MR_DATA" VERSION="1" LANGU="1" EXPOSURE="1" STATE="1" EDITORDER="1 " ATTDECLTYP="0" ATTEXPVIRT="0" TYPTYPE="3" TYPE="DATA" SRCROW1="0 " SRCCOLUMN1="0 " SRCROW2="0 " SRCCOLUMN2="0 " TYPESRC_LENG="0 "/>
+ <method CLSNAME="/UI2/CL_DATA_ACCESS" CMPNAME="AT" VERSION="1" LANGU="E" DESCRIPT="Component accessor" EXPOSURE="2" STATE="1" EDITORDER="3 " DISPID="0 " MTDTYPE="0" MTDDECLTYP="0" BCMTDCAT="00" BCMTDSYN="0">
+  <parameter CLSNAME="/UI2/CL_DATA_ACCESS" CMPNAME="AT" SCONAME="IV_COMPONENT" VERSION="1" LANGU="E" DESCRIPT="Sub-component name (xpath is supported)" CMPTYPE="1" MTDTYPE="0" EDITORDER="1 " DISPID="0 " PARDECLTYP="0" PARPASSTYP="1" TYPTYPE="1" TYPE="STRING" PAROPTIONL="X"/>
+  <parameter CLSNAME="/UI2/CL_DATA_ACCESS" CMPNAME="AT" SCONAME="RO_REF" VERSION="1" LANGU="E" DESCRIPT="Reference to accessor object pointing to subcomponent" CMPTYPE="1" MTDTYPE="0" EDITORDER="2 " DISPID="0 " PARDECLTYP="3" PARPASSTYP="0" TYPTYPE="3" TYPE="/UI2/CL_DATA_ACCESS"/>
+  <source>METHOD AT.
+
+    DATA:
+      lv_component TYPE string,
+      lv_sindex    TYPE string,
+      lv_keys      TYPE string,
+      lv_index     TYPE i,
+      lt_hier      TYPE match_result_tab.
+
+    FIELD-SYMBOLS:
+      &lt;component&gt; LIKE LINE OF lt_hier,
+      &lt;sub_match&gt; TYPE LINE OF submatch_result_tab.
+
+    &quot; (?:(\w+)|^)(?:\[(?:(\d+)|([^\]]+))\])? - no check for separators
+    FIND ALL OCCURRENCES OF REGEX `(?:(\w+)|^)(?:\[(?:(\d+)|([^\]]+))\])?(?:(?:-\&gt;)|(?:-)|(?:=&gt;)|$)` IN iv_component RESULTS lt_hier.
+
+    ro_ref = me.
+
+    LOOP AT lt_hier ASSIGNING &lt;component&gt;.
+      CHECK ro_ref-&gt;empty( ) EQ abap_false.
+      READ TABLE &lt;component&gt;-submatches INDEX 1 ASSIGNING &lt;sub_match&gt;.
+      IF &lt;sub_match&gt;-length IS INITIAL.
+        CLEAR lv_component.
+      ELSE.
+        lv_component = iv_component+&lt;sub_match&gt;-offset(&lt;sub_match&gt;-length).
+        TRANSLATE lv_component TO UPPER CASE.
+      ENDIF.
+      READ TABLE &lt;component&gt;-submatches INDEX 2 ASSIGNING &lt;sub_match&gt;.
+      IF &lt;sub_match&gt;-length IS INITIAL.
+        CLEAR lv_index.
+      ELSE.
+        lv_index = lv_sindex = iv_component+&lt;sub_match&gt;-offset(&lt;sub_match&gt;-length).
+      ENDIF.
+      READ TABLE &lt;component&gt;-submatches INDEX 3 ASSIGNING &lt;sub_match&gt;.
+      IF &lt;sub_match&gt;-length IS INITIAL.
+        CLEAR lv_keys.
+      ELSE.
+        lv_keys = iv_component+&lt;sub_match&gt;-offset(&lt;sub_match&gt;-length).
+      ENDIF.
+      ro_ref = ro_ref-&gt;at_int( iv_component = lv_component iv_index = lv_index iv_keys = lv_keys ).
+    ENDLOOP.
+
+  ENDMETHOD.                    &quot;at_int</source>
+ </method>
+ <method CLSNAME="/UI2/CL_DATA_ACCESS" CMPNAME="AT_INT" VERSION="1" LANGU="E" DESCRIPT="Internal helper for comonent access" EXPOSURE="1" STATE="1" EDITORDER="2 " DISPID="0 " MTDTYPE="0" MTDDECLTYP="0" BCMTDCAT="00" BCMTDSYN="0">
+  <parameter CLSNAME="/UI2/CL_DATA_ACCESS" CMPNAME="AT_INT" SCONAME="IV_COMPONENT" VERSION="1" LANGU="E" CMPTYPE="1" MTDTYPE="0" EDITORDER="1 " DISPID="0 " PARDECLTYP="0" PARPASSTYP="1" TYPTYPE="1" TYPE="STRING" PAROPTIONL="X"/>
+  <parameter CLSNAME="/UI2/CL_DATA_ACCESS" CMPNAME="AT_INT" SCONAME="IV_INDEX" VERSION="1" LANGU="E" CMPTYPE="1" MTDTYPE="0" EDITORDER="2 " DISPID="0 " PARDECLTYP="0" PARPASSTYP="1" TYPTYPE="1" TYPE="I" PAROPTIONL="X"/>
+  <parameter CLSNAME="/UI2/CL_DATA_ACCESS" CMPNAME="AT_INT" SCONAME="IV_KEYS" VERSION="1" LANGU="E" CMPTYPE="1" MTDTYPE="0" EDITORDER="3 " DISPID="0 " PARDECLTYP="0" PARPASSTYP="1" TYPTYPE="1" TYPE="STRING" PAROPTIONL="X"/>
+  <parameter CLSNAME="/UI2/CL_DATA_ACCESS" CMPNAME="AT_INT" SCONAME="RO_REF" VERSION="1" LANGU="E" CMPTYPE="1" MTDTYPE="0" EDITORDER="4 " DISPID="0 " PARDECLTYP="3" PARPASSTYP="0" TYPTYPE="3" TYPE="/UI2/CL_DATA_ACCESS"/>
+  <source>METHOD AT_INT.
+
+    DATA: lv_key   TYPE string,
+          lv_value TYPE string,
+          lt_keys  TYPE match_result_tab,
+          lr_data  TYPE REF TO data,
+          lo_type  TYPE REF TO cl_abap_typedescr.
+
+    FIELD-SYMBOLS: &lt;data&gt;      TYPE data,
+                   &lt;comp&gt;      TYPE data,
+                   &lt;key&gt;       LIKE LINE OF lt_keys,
+                   &lt;sub_match&gt; TYPE LINE OF submatch_result_tab,
+                   &lt;ref&gt;       TYPE REF TO data,
+                   &lt;table&gt;     TYPE ANY TABLE,
+                   &lt;idx_table&gt; TYPE INDEX TABLE.
+
+    IF mr_data IS BOUND.
+      IF iv_component IS NOT INITIAL.
+        ASSIGN mr_data-&gt;* TO &lt;data&gt;.
+        ASSIGN COMPONENT iv_component OF STRUCTURE &lt;data&gt; TO &lt;comp&gt;.
+        IF &lt;comp&gt; IS ASSIGNED.
+          GET REFERENCE OF &lt;comp&gt; INTO lr_data.
+          lr_data = deref( lr_data ).
+          ASSIGN lr_data TO &lt;ref&gt;.
+        ENDIF.
+      ELSE.
+        ASSIGN mr_data TO &lt;ref&gt;.
+      ENDIF.
+    ENDIF.
+
+    IF &lt;ref&gt; IS ASSIGNED AND ( iv_index IS NOT INITIAL OR iv_keys IS NOT INITIAL ).
+      lo_type = cl_abap_typedescr=&gt;describe_by_data_ref( &lt;ref&gt; ).
+      IF lo_type-&gt;kind EQ cl_abap_typedescr=&gt;kind_table.
+        &quot; check for table index access
+        IF iv_index IS NOT INITIAL.
+          ASSIGN &lt;ref&gt;-&gt;* TO &lt;idx_table&gt;.
+          IF sy-subrc IS INITIAL.
+            READ TABLE &lt;idx_table&gt; INDEX iv_index REFERENCE INTO &lt;ref&gt;.
+            IF sy-subrc IS NOT INITIAL.
+              UNASSIGN &lt;ref&gt;.
+            ENDIF.
+          ELSE.
+            UNASSIGN &lt;ref&gt;.
+          ENDIF.
+        ELSEIF iv_keys IS NOT INITIAL.
+          ASSIGN &lt;ref&gt;-&gt;* TO &lt;table&gt;.
+          IF sy-subrc IS INITIAL.
+            CREATE DATA lr_data LIKE LINE OF &lt;table&gt;.
+            ASSIGN lr_data-&gt;* TO &lt;data&gt;.
+            FIND ALL OCCURRENCES OF REGEX `(\w+)\s*=\s*([^,]*),?` IN iv_keys RESULTS lt_keys.
+            IF sy-subrc IS INITIAL.
+              LOOP AT lt_keys ASSIGNING &lt;key&gt;.
+                READ TABLE &lt;key&gt;-submatches INDEX 1 ASSIGNING &lt;sub_match&gt;.
+                lv_key = iv_keys+&lt;sub_match&gt;-offset(&lt;sub_match&gt;-length).
+                TRANSLATE lv_key TO UPPER CASE.
+                READ TABLE &lt;key&gt;-submatches INDEX 2 ASSIGNING &lt;sub_match&gt;.
+                lv_value = iv_keys+&lt;sub_match&gt;-offset(&lt;sub_match&gt;-length).
+                ASSIGN COMPONENT lv_key OF STRUCTURE &lt;data&gt; TO &lt;comp&gt;.
+                CHECK sy-subrc IS INITIAL.
+                &lt;comp&gt; = lv_value.
+              ENDLOOP.
+            ELSE.
+              &lt;data&gt; = lv_key.
+            ENDIF.
+            READ TABLE &lt;table&gt; FROM &lt;data&gt; REFERENCE INTO &lt;ref&gt;.
+            IF sy-subrc IS NOT INITIAL.
+              UNASSIGN &lt;ref&gt;.
+            ENDIF.
+          ELSE.
+            UNASSIGN &lt;ref&gt;.
+          ENDIF.
+        ENDIF.
+      ENDIF.
+    ENDIF.
+
+    IF &lt;ref&gt; IS ASSIGNED.
+      CREATE OBJECT ro_ref
+        EXPORTING
+          ir_data = &lt;ref&gt;.
+    ELSE.
+      CREATE OBJECT ro_ref.
+    ENDIF.
+
+  ENDMETHOD.                    &quot;at_int</source>
+ </method>
+ <method CLSNAME="/UI2/CL_DATA_ACCESS" CMPNAME="CONSTRUCTOR" VERSION="1" LANGU="E" DESCRIPT="Constructor" EXPOSURE="2" STATE="1" EDITORDER="2 " DISPID="0 " MTDTYPE="2" MTDDECLTYP="0" BCMTDCAT="00" BCMTDSYN="0">
+  <parameter CLSNAME="/UI2/CL_DATA_ACCESS" CMPNAME="CONSTRUCTOR" SCONAME="IR_DATA" VERSION="1" LANGU="E" DESCRIPT="Reference to data (allows modification)" CMPTYPE="1" MTDTYPE="2" EDITORDER="1 " DISPID="0 " PARDECLTYP="0" PARPASSTYP="1" TYPTYPE="3" TYPE="DATA" PAROPTIONL="X"/>
+  <parameter CLSNAME="/UI2/CL_DATA_ACCESS" CMPNAME="CONSTRUCTOR" SCONAME="IV_DATA" VERSION="1" LANGU="E" DESCRIPT="Data (modification not allowed)" CMPTYPE="1" MTDTYPE="2" EDITORDER="2 " DISPID="0 " PARDECLTYP="0" PARPASSTYP="1" TYPTYPE="1" TYPE="DATA" PAROPTIONL="X"/>
+  <source>METHOD CONSTRUCTOR.
+    IF ir_data IS NOT INITIAL.
+      mr_data = ir_data.
+    ELSEIF iv_data IS SUPPLIED.
+      GET REFERENCE OF iv_data INTO mr_data.
+    ENDIF.
+    mr_data = deref( mr_data ).
+  ENDMETHOD.                    &quot;constructor</source>
+ </method>
+ <method CLSNAME="/UI2/CL_DATA_ACCESS" CMPNAME="CREATE" VERSION="1" LANGU="E" DESCRIPT="Helper method for creating instance of dynamic accessor" EXPOSURE="2" STATE="1" EDITORDER="1 " DISPID="0 " MTDTYPE="0" MTDDECLTYP="1" BCMTDCAT="00" BCMTDSYN="0">
+  <parameter CLSNAME="/UI2/CL_DATA_ACCESS" CMPNAME="CREATE" SCONAME="IR_DATA" VERSION="1" LANGU="E" DESCRIPT="Reference to data (allows modification)" CMPTYPE="1" MTDTYPE="0" EDITORDER="1 " DISPID="0 " PARDECLTYP="0" PARPASSTYP="1" TYPTYPE="3" TYPE="DATA" PAROPTIONL="X"/>
+  <parameter CLSNAME="/UI2/CL_DATA_ACCESS" CMPNAME="CREATE" SCONAME="IV_DATA" VERSION="1" LANGU="E" DESCRIPT="Data (modification not allowed)" CMPTYPE="1" MTDTYPE="0" EDITORDER="2 " DISPID="0 " PARDECLTYP="0" PARPASSTYP="1" TYPTYPE="1" TYPE="DATA" PAROPTIONL="X"/>
+  <parameter CLSNAME="/UI2/CL_DATA_ACCESS" CMPNAME="CREATE" SCONAME="IV_COMPONENT" VERSION="1" LANGU="E" DESCRIPT="Sub-component name (xpath is supported)" CMPTYPE="1" MTDTYPE="0" EDITORDER="3 " DISPID="0 " PARDECLTYP="0" PARPASSTYP="1" TYPTYPE="1" TYPE="STRING" PAROPTIONL="X"/>
+  <parameter CLSNAME="/UI2/CL_DATA_ACCESS" CMPNAME="CREATE" SCONAME="RO_REF" VERSION="1" LANGU="E" DESCRIPT="Reference to accessor object pointing to subcomponent" CMPTYPE="1" MTDTYPE="0" EDITORDER="4 " DISPID="0 " PARDECLTYP="3" PARPASSTYP="0" TYPTYPE="3" TYPE="/UI2/CL_DATA_ACCESS"/>
+  <source>METHOD CREATE.
+    IF iv_data IS SUPPLIED.
+      CREATE OBJECT ro_ref
+        EXPORTING
+          iv_data = iv_data.
+    ELSE.
+      CREATE OBJECT ro_ref
+        EXPORTING
+          ir_data = ir_data.
+    ENDIF.
+
+    IF iv_component IS NOT INITIAL.
+      ro_ref = ro_ref-&gt;at( iv_component ).
+    ENDIF.
+  ENDMETHOD.                    &quot;create</source>
+ </method>
+ <method CLSNAME="/UI2/CL_DATA_ACCESS" CMPNAME="DEREF" VERSION="1" LANGU="E" DESCRIPT="Dereference deep nested references" EXPOSURE="1" STATE="1" EDITORDER="1 " DISPID="0 " MTDTYPE="0" MTDDECLTYP="1" BCMTDCAT="00" BCMTDSYN="0">
+  <parameter CLSNAME="/UI2/CL_DATA_ACCESS" CMPNAME="DEREF" SCONAME="IR_DATA" VERSION="1" LANGU="E" CMPTYPE="1" MTDTYPE="0" EDITORDER="1 " DISPID="0 " PARDECLTYP="0" PARPASSTYP="1" TYPTYPE="3" TYPE="DATA"/>
+  <parameter CLSNAME="/UI2/CL_DATA_ACCESS" CMPNAME="DEREF" SCONAME="RR_DATA" VERSION="1" LANGU="E" CMPTYPE="1" MTDTYPE="0" EDITORDER="2 " DISPID="0 " PARDECLTYP="3" PARPASSTYP="0" TYPTYPE="3" TYPE="DATA"/>
+  <source>METHOD DEREF.
+
+    DATA: lo_type TYPE REF TO cl_abap_typedescr.
+
+    FIELD-SYMBOLS: &lt;data&gt; TYPE data.
+
+    rr_data = ir_data.
+    IF rr_data IS NOT INITIAL.
+      lo_type = cl_abap_typedescr=&gt;describe_by_data_ref( ir_data ).
+      IF lo_type-&gt;kind EQ cl_abap_typedescr=&gt;kind_ref.
+        ASSIGN ir_data-&gt;* TO &lt;data&gt;.
+        rr_data = deref( &lt;data&gt; ).
+      ENDIF.
+    ENDIF.
+
+  ENDMETHOD.                    &quot;deref</source>
+ </method>
+ <method CLSNAME="/UI2/CL_DATA_ACCESS" CMPNAME="EMPTY" VERSION="1" LANGU="E" DESCRIPT="Returns TRUE if embedded object is initial (not bound)" EXPOSURE="2" STATE="1" EDITORDER="4 " DISPID="0 " MTDTYPE="0" MTDDECLTYP="0" BCMTDCAT="00" BCMTDSYN="0">
+  <parameter CLSNAME="/UI2/CL_DATA_ACCESS" CMPNAME="EMPTY" SCONAME="RV_VAL" VERSION="1" LANGU="E" DESCRIPT="ABAP_TRUE if object is initial and data is not bound" CMPTYPE="1" MTDTYPE="0" EDITORDER="1 " DISPID="0 " PARDECLTYP="3" PARPASSTYP="0" TYPTYPE="1" TYPE="ABAP_BOOL"/>
+  <source>METHOD EMPTY.
+    IF mr_data IS INITIAL.
+      rv_val = abap_true.
+    ENDIF.
+  ENDMETHOD.                    &quot;empty</source>
+ </method>
+ <method CLSNAME="/UI2/CL_DATA_ACCESS" CMPNAME="REF" VERSION="1" LANGU="E" DESCRIPT="Returns reference to embedded object" EXPOSURE="2" STATE="1" EDITORDER="5 " DISPID="0 " MTDTYPE="0" MTDDECLTYP="0" BCMTDCAT="00" BCMTDSYN="0">
+  <parameter CLSNAME="/UI2/CL_DATA_ACCESS" CMPNAME="REF" SCONAME="RV_DATA" VERSION="1" LANGU="E" DESCRIPT="Reference to embedded data" CMPTYPE="1" MTDTYPE="0" EDITORDER="1 " DISPID="0 " PARDECLTYP="3" PARPASSTYP="0" TYPTYPE="3" TYPE="DATA"/>
+  <source>METHOD REF.
+    rv_data = mr_data.
+  ENDMETHOD.                    &quot;ref</source>
+ </method>
+ <method CLSNAME="/UI2/CL_DATA_ACCESS" CMPNAME="SET" VERSION="1" LANGU="E" DESCRIPT="Sets value of the embedded object, if not initial" EXPOSURE="2" STATE="1" EDITORDER="7 " DISPID="0 " MTDTYPE="0" MTDDECLTYP="0" BCMTDCAT="00" BCMTDSYN="0">
+  <parameter CLSNAME="/UI2/CL_DATA_ACCESS" CMPNAME="SET" SCONAME="IV_DATA" VERSION="1" LANGU="E" DESCRIPT="New value for embedded object" CMPTYPE="1" MTDTYPE="0" EDITORDER="1 " DISPID="0 " PARDECLTYP="0" PARPASSTYP="1" TYPTYPE="1" TYPE="DATA"/>
+  <parameter CLSNAME="/UI2/CL_DATA_ACCESS" CMPNAME="SET" SCONAME="RV_SUCCESS" VERSION="1" LANGU="E" DESCRIPT="TRUE, if data was successfully modified" CMPTYPE="1" MTDTYPE="0" EDITORDER="2 " DISPID="0 " PARDECLTYP="3" PARPASSTYP="0" TYPTYPE="1" TYPE="ABAP_BOOL"/>
+  <source>METHOD SET.
+
+    FIELD-SYMBOLS: &lt;data&gt; TYPE data.
+
+    IF mr_data IS BOUND.
+      ASSIGN mr_data-&gt;* TO &lt;data&gt;.
+      &lt;data&gt; = iv_data.
+      rv_success = abap_true.
+    ENDIF.
+
+  ENDMETHOD.</source>
+ </method>
+ <method CLSNAME="/UI2/CL_DATA_ACCESS" CMPNAME="VALUE" VERSION="1" LANGU="E" DESCRIPT="Returns copy of the value" EXPOSURE="2" STATE="1" EDITORDER="6 " DISPID="0 " MTDTYPE="0" MTDDECLTYP="0" BCMTDCAT="00" BCMTDSYN="0">
+  <parameter CLSNAME="/UI2/CL_DATA_ACCESS" CMPNAME="VALUE" SCONAME="IV_DEFAULT" VERSION="1" LANGU="E" DESCRIPT="Default value to be returned, if no data is assigned" CMPTYPE="1" MTDTYPE="0" EDITORDER="1 " DISPID="0 " PARDECLTYP="0" PARPASSTYP="1" TYPTYPE="1" TYPE="DATA" PAROPTIONL="X"/>
+  <parameter CLSNAME="/UI2/CL_DATA_ACCESS" CMPNAME="VALUE" SCONAME="EV_DATA" VERSION="1" LANGU="E" DESCRIPT="Copy of the embedded data value, or initial" CMPTYPE="1" MTDTYPE="0" EDITORDER="2 " DISPID="0 " PARDECLTYP="1" PARPASSTYP="1" TYPTYPE="1" TYPE="DATA"/>
+  <source>METHOD VALUE.
+
+    DATA: lo_type_out TYPE REF TO cl_abap_typedescr,
+          lo_type_in  TYPE REF TO cl_abap_typedescr.
+
+    FIELD-SYMBOLS: &lt;data&gt; TYPE data.
+
+    CLEAR ev_data.
+
+    IF mr_data IS BOUND.
+      ASSIGN mr_data-&gt;* TO &lt;data&gt;.
+      lo_type_out = cl_abap_typedescr=&gt;describe_by_data( ev_data ).
+      lo_type_in = cl_abap_typedescr=&gt;describe_by_data( &lt;data&gt; ).
+      IF lo_type_out-&gt;kind EQ lo_type_in-&gt;kind.
+        ev_data = &lt;data&gt;.
+      ENDIF.
+    ELSEIF iv_default IS SUPPLIED.
+      ev_data = iv_default.
+    ENDIF.
+
+  ENDMETHOD.                    &quot;value</source>
+ </method>
+</CLAS>
